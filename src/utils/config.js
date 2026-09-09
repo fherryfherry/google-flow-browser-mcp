@@ -25,7 +25,8 @@ export function get(key, fallback = undefined) {
 }
 
 export function getFlowHome() {
-  return config.flowHome || FLOW_HOME;
+  if (!config.flowHome || config.flowHome === '.') return FLOW_HOME;
+  return path.resolve(FLOW_HOME, config.flowHome);
 }
 
 const DEFAULT_CHROME_PATHS = {

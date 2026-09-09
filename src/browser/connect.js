@@ -115,12 +115,33 @@ export async function launchChromeDirect(options = {}) {
   }
 
   const tempDir = `/tmp/chrome-kiara-cdp-${Date.now()}`;
-  fs.mkdirSync(tempDir, { recursive: true });
+  const tempProfileDir = path.join(tempDir, 'Profile 3');
+  fs.mkdirSync(tempProfileDir, { recursive: true });
 
-  const localStateSrc = path.resolve(path.dirname(profileSource), '../Local State');
+  // Copy only what's needed to stay logged in — skip Cache/History/etc (GBs of
+  // dead weight) and skip session/lock files, which is what triggers Chrome's
+  // "Restore pages?" popup and slows startup on large real-world profiles.
+  const SESSION_ITEMS = ['Cookies', 'Cookies-journal', 'Network', 'Local Storage', 'IndexedDB', 'Preferences', 'Login Data', 'Web Data'];
   if (fs.existsSync(profileSource)) {
-    fs.cpSync(profileSource, path.join(tempDir, 'Profile 3'), { recursive: true });
+    for (const item of SESSION_ITEMS) {
+      const src = path.join(profileSource, item);
+      if (fs.existsSync(src)) {
+        fs.cpSync(src, path.join(tempProfileDir, item), { recursive: true });
+      }
+    }
+    const prefsPath = path.join(tempProfileDir, 'Preferences');
+    if (fs.existsSync(prefsPath)) {
+      try {
+        const prefs = JSON.parse(fs.readFileSync(prefsPath, 'utf-8'));
+        prefs.profile = prefs.profile || {};
+        prefs.profile.exit_type = 'Normal';
+        prefs.profile.exited_cleanly = true;
+        fs.writeFileSync(prefsPath, JSON.stringify(prefs));
+      } catch { /* leave Preferences as-is if unreadable */ }
+    }
   }
+
+  const localStateSrc = path.join(path.dirname(profileSource), 'Local State');
   if (fs.existsSync(localStateSrc)) {
     fs.cpSync(localStateSrc, path.join(tempDir, 'Local State'));
   } else {
@@ -150,8 +171,9 @@ export async function launchChromeDirect(options = {}) {
   const chromeProcess = spawn(chromePath, args, { stdio: ['ignore', 'pipe', 'pipe'] });
 
   const cdpUrl = `http://127.0.0.1:${cdpPort}`;
+  const maxAttempts = 60;
   let attempts = 0;
-  while (attempts < 20) {
+  while (attempts < maxAttempts) {
     try {
       const resp = await fetch(`${cdpUrl}/json/version`);
       if (resp.ok) break;
@@ -159,7 +181,7 @@ export async function launchChromeDirect(options = {}) {
     await new Promise(r => setTimeout(r, 1000));
     attempts++;
   }
-  if (attempts >= 20) {
+  if (attempts >= maxAttempts) {
     throw new FlowError(ErrorCodes.PLAYWRIGHT_ERROR, 'Chrome CDP failed to start in time');
   }
 
