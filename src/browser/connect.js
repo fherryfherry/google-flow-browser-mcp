@@ -3,7 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import { spawn } from 'child_process';
 import { logger } from '../utils/logger.js';
-import { get } from '../utils/config.js';
+import { get, getDefaultChromePath } from '../utils/config.js';
 import { FlowError, ErrorCodes } from '../utils/errors.js';
 import { takeScreenshot } from '../utils/screenshots.js';
 
@@ -46,7 +46,7 @@ export async function connectToBrowser(options = {}) {
 }
 
 async function launchNewBrowser(cdpPort, options = {}) {
-  const chromePath = options.chromePath || '/opt/google/chrome/chrome';
+  const chromePath = options.chromePath || getDefaultChromePath();
   const profileDir = options.profileDir || path.resolve(import.meta.dirname, '../../chrome-profile-kiara');
 
   if (!fs.existsSync(chromePath)) {
@@ -100,7 +100,7 @@ async function launchNewBrowser(cdpPort, options = {}) {
  * launches Chrome via shell, then connects Playwright via CDP.
  */
 export async function launchChromeDirect(options = {}) {
-  const chromePath = options.chromePath || '/opt/google/chrome/chrome';
+  const chromePath = options.chromePath || getDefaultChromePath();
   const cdpPort = options.cdpPort || get('cdpPort', 9222);
   const headless = options.headless ?? get('headless', false);
   const profileSource = options.profileSource || path.resolve(process.env.HOME, '.config/google-chrome/Profile 3');

@@ -27,3 +27,13 @@ export function get(key, fallback = undefined) {
 export function getFlowHome() {
   return config.flowHome || FLOW_HOME;
 }
+
+const DEFAULT_CHROME_PATHS = {
+  darwin: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+  linux: '/opt/google/chrome/chrome',
+  win32: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+};
+
+export function getDefaultChromePath() {
+  return config.chromePath || DEFAULT_CHROME_PATHS[process.platform] || DEFAULT_CHROME_PATHS.linux;
+}

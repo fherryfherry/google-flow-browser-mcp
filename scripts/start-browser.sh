@@ -5,16 +5,25 @@ IFS=$'\n\t'
 # Start Chrome with configured Google profile and CDP debugging
 # Edit the variables below to match your setup, then run BEFORE the MCP server
 
-CHROME="/opt/google/chrome/chrome"
-USER_DATA_DIR="$HOME/.config/google-chrome"
-PROFILE="Profile 3"
-CDP_PORT=9222
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+CONFIG="$SCRIPT_DIR/../config/flow.config.json"
+
+case "$(uname -s)" in
+  Darwin) DEFAULT_CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" ;;
+  *)      DEFAULT_CHROME="/opt/google/chrome/chrome" ;;
+esac
+
+CHROME=$(jq -r ".chromePath // \"$DEFAULT_CHROME\"" "$CONFIG" 2>/dev/null || echo "$DEFAULT_CHROME")
+USER_DATA_DIR=$(jq -r '.chromeUserDataDir' "$CONFIG" 2>/dev/null)
+PROFILE=$(jq -r '.chromeProfile // "Default"' "$CONFIG" 2>/dev/null)
+CDP_PORT=$(jq -r '.cdpPort // 9222' "$CONFIG" 2>/dev/null)
 
 log()  { echo "[$(date '+%Y-%m-%dT%H:%M:%S')] INFO  $*" >&2; }
 warn() { echo "[$(date '+%Y-%m-%dT%H:%M:%S')] WARN  $*" >&2; }
 die()  { echo "[$(date '+%Y-%m-%dT%H:%M:%S')] ERROR $*" >&2; exit 1; }
 
-command -v "$CHROME" >/dev/null 2>&1 || die "Chrome not found at $CHROME"
+[[ -n "$USER_DATA_DIR" && "$USER_DATA_DIR" != "null" ]] || die "chromeUserDataDir not set in $CONFIG"
+[[ -x "$CHROME" ]] || die "Chrome not found at $CHROME"
 
 if lsof -i :$CDP_PORT >/dev/null 2>&1; then
   warn "CDP port $CDP_PORT already in use — checking if it's our Chrome..."
@@ -24,7 +33,7 @@ if lsof -i :$CDP_PORT >/dev/null 2>&1; then
     exit 0
   else
     warn "Port $CDP_PORT is occupied but not responding to CDP. Attempting to kill..."
-    fuser -k "${CDP_PORT}/tcp" 2>/dev/null || true
+    lsof -ti ":$CDP_PORT" | xargs kill -9 2>/dev/null || true
     sleep 2
   fi
 fi

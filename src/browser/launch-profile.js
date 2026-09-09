@@ -2,11 +2,11 @@ import { chromium } from 'playwright';
 import path from 'path';
 import fs from 'fs';
 import { logger } from '../utils/logger.js';
-import { get } from '../utils/config.js';
+import { get, getDefaultChromePath } from '../utils/config.js';
 import { FlowError, ErrorCodes } from '../utils/errors.js';
 import { launchChromeDirect, setPage, setContext, setConnected, setBrowser, isBrowserConnected } from './connect.js';
 
-const CHROME_PATH = '/opt/google/chrome/chrome';
+const CHROME_PATH = getDefaultChromePath();
 const CDP_PORT = get('cdpPort', 9222);
 const FLOW_URL = get('flowUrl', 'https://labs.google/fx/fr/tools/flow');
 
@@ -16,11 +16,17 @@ export async function launchKiaraProfile(headless = false) {
     return { success: true, message: 'Already connected' };
   }
 
-  const profileSource = path.resolve(process.env.HOME, '.config/google-chrome/Profile 3');
+  const chromeUserDataDir = get('chromeUserDataDir');
+  const chromeProfile = get('chromeProfile', 'Default');
+  if (!chromeUserDataDir) {
+    throw new FlowError(ErrorCodes.CONFIG_ERROR,
+      'chromeUserDataDir is not set in config/flow.config.json');
+  }
+  const profileSource = path.join(chromeUserDataDir, chromeProfile);
 
   if (!fs.existsSync(profileSource)) {
     throw new FlowError(ErrorCodes.CONFIG_ERROR,
-      `Profile 3 not found at ${profileSource}. Make sure Chrome Profile 3 exists and is configured with your Google account.`);
+      `Chrome profile not found at ${profileSource}. Check chromeUserDataDir/chromeProfile in config/flow.config.json.`);
   }
 
   logger.info('Launching Chrome via direct+CDP method (anti-detection)', { profileSource });
