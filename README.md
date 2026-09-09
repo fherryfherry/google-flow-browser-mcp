@@ -139,13 +139,20 @@ chmod +x scripts/*.sh
 ./scripts/start-mcp.sh
 ```
 
-### 6️⃣ Register with OpenCode
+### 6️⃣ Register with your agent
 
+**Claude Code:**
+```bash
+./scripts/register-claude.sh          # scope: user (default), or pass local/project
+```
+> Uses the official `claude mcp add` CLI. Verify with `claude mcp list`.
+
+**OpenCode:**
 ```bash
 ./scripts/register-opencode.sh
 ```
 
-> 🔄 **Restart OpenCode** after registration for the changes to take effect.
+> 🔄 **Restart your agent** after registration for the changes to take effect.
 
 ### ✅ Verify it works
 
@@ -168,7 +175,8 @@ google-flow-browser-mcp/
 │   ├── start-browser.sh            # Launch Chrome + CDP
 │   ├── start-mcp.sh                # Start the MCP server
 │   ├── test-flow-image.sh          # Quick integration test
-│   └── register-opencode.sh        # Register in OpenCode config
+│   ├── register-opencode.sh        # Register in OpenCode config
+│   └── register-claude.sh          # Register with Claude Code (`claude mcp add`)
 │
 ├── 📂 src/
 │   ├── index.js                    # MCP server entry point
