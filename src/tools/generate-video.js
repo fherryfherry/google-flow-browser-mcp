@@ -162,9 +162,72 @@ export async function handleGenerateVideo(args) {
     await promptInput.type(args.prompt, { delay: 20 });
     await page.waitForTimeout(500);
 
-    // Video generation is paid — setup only, no click
-    logger.info('Video generation setup complete — not clicking generate (paid feature)');
     await takeScreenshot(page, 'video-ready-to-generate');
+
+    // Video generation is paid — only clicks Generate when explicitly confirmed.
+    if (args.auto_confirm !== true) {
+      logger.info('Video generation setup complete — not clicking generate (paid feature)');
+
+      saveMetadata(job.id, {
+        type: 'video',
+        model,
+        ratio,
+        duration,
+        quantity: qty,
+        prompt: args.prompt,
+        status: 'ready_for_confirmation',
+        note: 'Video generation is a paid feature. Call again with auto_confirm=true to proceed.',
+      });
+
+      jobQueue.completeJob(job.id, {
+        status: 'ready_for_confirmation',
+        type: 'video',
+        account: get('expectedAccount'),
+        model_used: model,
+        ratio,
+        duration,
+        quantity: qty,
+        prompt: args.prompt,
+        message: 'Video generation setup complete. Call again with auto_confirm=true to consume credits and generate.',
+        screenshot: await takeScreenshot(page, 'video-ready'),
+      });
+
+      return jobQueue.getJob(job.id).result;
+    }
+
+    logger.info('auto_confirm=true — looking for Generate button');
+    const generateBtnLocator = page.locator(
+      '.generate-icon-button, [aria-label="Start generation"], button:has-text("Generate")'
+    ).first();
+    const generateBtnReady = await generateBtnLocator.waitFor({ state: 'visible', timeout: 20000 }).then(() => true).catch(() => false);
+    if (!generateBtnReady) {
+      await takeScreenshot(page, 'video-no-generate-btn');
+      throw new FlowError(ErrorCodes.GENERATION_BUTTON_DISABLED, 'Generate button not found');
+    }
+    if (await generateBtnLocator.isDisabled().catch(() => false)) {
+      await takeScreenshot(page, 'video-generate-disabled');
+      throw new FlowError(ErrorCodes.GENERATION_BUTTON_DISABLED, 'Generate button is disabled');
+    }
+
+    logger.info('⚠️⚠️⚠️ Clicking Generate — credits will be consumed (video)');
+    await generateBtnLocator.click();
+
+    // Some flows show an Agent "Accepter/Approve" confirmation before starting.
+    const acceptTimeoutMs = get('agentResponseTimeoutMs', 5000);
+    const acceptStart = Date.now();
+    while (Date.now() - acceptStart < acceptTimeoutMs) {
+      const pageText = await page.evaluate(() => document.body.innerText).catch(() => '');
+      if (pageText.includes('Accepter') || pageText.includes('Approve')) {
+        const acceptBtn = page.locator('button').filter({ hasText: /Accepter|Approve/ }).first();
+        await acceptBtn.click();
+        logger.info('Generation confirmed via Agent');
+        break;
+      }
+      await page.waitForTimeout(500);
+    }
+
+    await page.waitForTimeout(2000);
+    const postClickScreenshot = await takeScreenshot(page, 'video-generating');
 
     saveMetadata(job.id, {
       type: 'video',
@@ -173,12 +236,11 @@ export async function handleGenerateVideo(args) {
       duration,
       quantity: qty,
       prompt: args.prompt,
-      status: 'ready_for_confirmation',
-      note: 'Video generation is a paid feature. Manual confirmation required to proceed.',
+      status: 'generating',
     });
 
     jobQueue.completeJob(job.id, {
-      status: 'ready_for_confirmation',
+      status: 'generating',
       type: 'video',
       account: get('expectedAccount'),
       model_used: model,
@@ -186,14 +248,14 @@ export async function handleGenerateVideo(args) {
       duration,
       quantity: qty,
       prompt: args.prompt,
-      message: 'Video generation setup complete. Manual confirmation required (uses credits).',
-      screenshot: await takeScreenshot(page, 'video-ready'),
+      message: 'Generate clicked — video is rendering in Google Flow. Use flow_status or flow_download_latest to check progress/retrieve it.',
+      screenshot: postClickScreenshot,
     });
 
     return jobQueue.getJob(job.id).result;
   } catch (err) {
-    await takeScreenshot(getPage(), 'generate-video-error');
     jobQueue.failJob(job.id, err);
+    try { await takeScreenshot(getPage(), 'generate-video-error'); } catch { /* browser may be disconnected */ }
     throw err;
   }
 }

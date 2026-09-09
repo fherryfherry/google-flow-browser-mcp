@@ -107,8 +107,8 @@ export async function handleCreateCharacter(args) {
 
     return jobQueue.getJob(job.id).result;
   } catch (err) {
-    await takeScreenshot(getPage(), 'create-character-error');
     jobQueue.failJob(job.id, err);
+    try { await takeScreenshot(getPage(), 'create-character-error'); } catch { /* browser may be disconnected */ }
     throw err;
   }
 }

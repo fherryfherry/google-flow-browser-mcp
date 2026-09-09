@@ -92,7 +92,7 @@ const TOOL_DEFINITIONS = [
   },
   {
     name: 'flow_generate_video',
-    description: 'Set up a video generation in Google Flow. Fills prompt, selects Omni Flash or Veo model, configures settings. NOTE: Does NOT click final Generate (paid feature — stops at ready-to-generate).',
+    description: 'Set up a video generation in Google Flow. Fills prompt, selects Omni Flash or Veo model, configures settings. By default (auto_confirm=false) stops at ready-to-generate and does NOT click Generate (paid feature). Pass auto_confirm=true to click Generate and consume credits.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -100,6 +100,7 @@ const TOOL_DEFINITIONS = [
         model: { type: 'string', description: 'Model: Omni Flash, Veo 2, Nano Banana 2.', default: 'Omni Flash' },
         ratio: { type: 'string', description: 'Aspect ratio: 16:9, 9:16, 1:1.', default: '16:9' },
         duration: { type: 'number', description: 'Target duration in seconds.', default: 5 },
+        auto_confirm: { type: 'boolean', description: '⚠️ CREDITS. If false (default): sets up only, does not click Generate. If true: clicks Generate (consumes credits).', default: false },
         reference_images: { type: 'array', items: { type: 'string' }, description: 'Paths to reference images (optional).' },
         project_name: { type: 'string', description: 'Name for the project (will reuse existing project with same campaign, or create new).' },
         campaign: { type: 'string', description: 'Campaign identifier for project matching (e.g., "ete-2026", "nouvelle-collection").' },

@@ -117,7 +117,7 @@ export async function handleGenerateImage(args) {
 
     // Also verify the generate button exists (confirms the toolbar is active)
     const hasGenerateBtn = await page.locator(
-      'button:has-text("arrow_forward"), button:has-text("Créer")'
+      '.generate-icon-button, [aria-label="Start generation"], button:has-text("Créer")'
     ).first().isVisible().catch(() => false);
     if (!hasGenerateBtn) {
       logger.warn('Generate button not visible on project page');
@@ -186,10 +186,9 @@ export async function handleGenerateImage(args) {
 
     // STEP 8: Find generate button
     const generateBtnLocator = page.locator(
-      'button:has-text("arrow_forward"), ' +
-      'button:has-text("Generate")'
+      '.generate-icon-button, [aria-label="Start generation"], button:has-text("Generate")'
     ).first();
-    const generateBtnVisible = await generateBtnLocator.isVisible().catch(() => false);
+    const generateBtnVisible = await generateBtnLocator.waitFor({ state: 'visible', timeout: 20000 }).then(() => true).catch(() => false);
     if (!generateBtnVisible) {
       await takeScreenshot(page, 'no-generate-btn');
       throw new FlowError(ErrorCodes.GENERATION_BUTTON_DISABLED, 'Generate button not found');
@@ -346,8 +345,8 @@ export async function handleGenerateImage(args) {
 
     return jobQueue.getJob(job.id).result;
   } catch (err) {
-    await takeScreenshot(getPage(), 'generate-image-error');
     jobQueue.failJob(job.id, err);
+    try { await takeScreenshot(getPage(), 'generate-image-error'); } catch { /* browser may be disconnected */ }
     throw err;
   }
 }

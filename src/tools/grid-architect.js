@@ -149,8 +149,8 @@ export async function handleUseGridArchitect(args) {
 
     return jobQueue.getJob(job.id).result;
   } catch (err) {
-    await takeScreenshot(getPage(), 'grid-architect-error');
     jobQueue.failJob(job.id, err);
+    try { await takeScreenshot(getPage(), 'grid-architect-error'); } catch { /* browser may be disconnected */ }
     throw err;
   }
 }
