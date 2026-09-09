@@ -99,61 +99,61 @@ export async function handleGenerateVideo(args) {
       throw new FlowError(ErrorCodes.UNKNOWN_UI_CHANGE, 'Could not find prompt input for video');
     }
 
-    // Model selection dropdown
-    try {
-      const modelLocator = page.locator('button:has-text("Omni"), button:has-text("Veo"), [class*="model"] button').first();
-      if (await modelLocator.isVisible().catch(() => false)) {
-        await modelLocator.click();
-        await page.waitForTimeout(500);
-        const optLocator = page.locator(`text="${model}"`).first();
-        if (await optLocator.isVisible().catch(() => false)) {
-          await optLocator.click();
-          await page.waitForTimeout(500);
-        } else {
-          await page.keyboard.press('Escape');
-        }
-      }
-    } catch (err) {
-      logger.warn('Could not select video model', { error: err.message });
-    }
-
-    // Select ratio
+    // Ratio/duration validation (against config lists)
     const ratios = get('videoRatios', ['9:16', '16:9']);
     const ratio = args.ratio || '16:9';
     if (!ratios.includes(ratio)) {
       throw new FlowError(ErrorCodes.RATIO_NOT_AVAILABLE, `Ratio ${ratio} not available for video`);
     }
-    try {
-      const ratioBtn = page.locator(`button:has-text("${ratio}")`).first();
-      if (await ratioBtn.isVisible().catch(() => false)) {
-        await ratioBtn.click();
-        await page.waitForTimeout(500);
-      }
-    } catch { /* ok */ }
-
-    // Select duration
-    const durations = get('durations', ['4s', '6s', '8s', '10s']);
-    const duration = args.duration || '4s';
-    if (!durations.includes(duration)) {
-      logger.warn('Duration not available, using 4s', { requested: duration });
-    }
-    try {
-      const durBtn = page.locator(`button:has-text("${duration}")`).first();
-      if (await durBtn.isVisible().catch(() => false)) {
-        await durBtn.click();
-        await page.waitForTimeout(500);
-      }
-    } catch { /* ok */ }
-
-    // Select quantity
+    const availableDurations = get('durations', ['4s', '6s', '8s', '10s']);
+    const requestedDuration = typeof args.duration === 'number' ? `${args.duration}s` : (args.duration || '4s');
+    const duration = availableDurations.includes(requestedDuration)
+      ? requestedDuration
+      : availableDurations.reduce((closest, d) =>
+          Math.abs(parseInt(d) - parseInt(requestedDuration)) < Math.abs(parseInt(closest) - parseInt(requestedDuration)) ? d : closest,
+          availableDurations[0]);
     const qty = Math.min(Math.max(args.quantity || 1, 1), 4);
+
+    // Mode/ratio/duration/quantity all live behind the "Settings trigger" button,
+    // not as standalone toolbar buttons — Flow renders them as a radio-button panel.
     try {
-      const qtyBtn = page.locator(`button:has-text("x${qty}")`).first();
-      if (await qtyBtn.isVisible().catch(() => false)) {
-        await qtyBtn.click();
+      const settingsTrigger = page.locator('[aria-label="Settings trigger"]').first();
+      if (await settingsTrigger.isVisible().catch(() => false)) {
+        await settingsTrigger.click();
         await page.waitForTimeout(500);
+
+        const videoModeRadio = page.locator('[role="radio"]:has-text("Video")').first();
+        if (await videoModeRadio.isVisible().catch(() => false)) {
+          await videoModeRadio.click();
+          await page.waitForTimeout(500);
+        }
+
+        const ratioRadio = page.locator(`[role="radio"]:has-text("${ratio}")`).first();
+        if (await ratioRadio.isVisible().catch(() => false)) {
+          await ratioRadio.click();
+          await page.waitForTimeout(300);
+        }
+
+        const durationRadio = page.locator(`[role="radio"]:has-text("${duration}")`).first();
+        if (await durationRadio.isVisible().catch(() => false)) {
+          await durationRadio.click();
+          await page.waitForTimeout(300);
+        }
+
+        const qtyRadio = page.locator(`[role="radio"]:has-text("x${qty}")`).first();
+        if (await qtyRadio.isVisible().catch(() => false)) {
+          await qtyRadio.click();
+          await page.waitForTimeout(300);
+        }
+
+        await page.keyboard.press('Escape');
+        await page.waitForTimeout(500);
+      } else {
+        logger.warn('Settings trigger not found — using project defaults for mode/ratio/duration/quantity');
       }
-    } catch { /* ok */ }
+    } catch (err) {
+      logger.warn('Could not configure video settings', { error: err.message });
+    }
 
     // Fill prompt
     await promptInput.click();
